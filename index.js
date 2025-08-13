@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 app.use(bodyParser.json());
 
 // Variables de entorno
