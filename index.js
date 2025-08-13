@@ -1,44 +1,21 @@
 import express from 'express';
-import bodyParser from 'body-parser';
-import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
-import express from 'express';
 
 const app = express();
 app.use(express.json());
 
+// Conexión a Supabase con variables de entorno de Render
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
 
-dotenv.config();
-
-const app = express();
-app.use(bodyParser.json());
-
-// Ruta raíz para evitar "Cannot GET /"
+// Ruta de prueba para confirmar que el backend funciona
 app.get('/', (req, res) => {
-  res.send('Servidor de WeWeb-dLocal listo para recibir peticiones 🚀');
+  res.send('Backend funcionando correctamente 🚀');
 });
 
-// Endpoint para crear pagos
-app.post('/create-payment', (req, res) => {
-  // Simulación de creación de pago dLocal
-  res.json({ message: 'Pago de prueba creado', data: req.body });
-});
-
-// Webhook para recibir notificaciones de dLocal
-app.post('/webhook', (req, res) => {
-  console.log('Webhook recibido:', req.body);
-  res.sendStatus(200);
-});
-
-// Endpoint de prueba
-app.get('/api/test', (req, res) => {
-  res.json({ message: 'Backend funcionando correctamente 🎉' });
-});
-
+// Ruta para insertar un nuevo pago en la base de datos
 app.post('/add-payment', async (req, res) => {
   const { user_id, amount, status } = req.body;
 
@@ -51,11 +28,13 @@ app.post('/add-payment', async (req, res) => {
 
     res.json({ message: 'Pago guardado en Supabase', data });
   } catch (err) {
-    console.error(err);
+    console.error('Error insertando pago:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
+// Puerto para Render
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
 });
