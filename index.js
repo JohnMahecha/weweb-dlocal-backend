@@ -39,19 +39,20 @@ app.get('/api/test', (req, res) => {
 app.post('/add-payment', async (req, res) => {
   const { user_id, amount, status } = req.body;
 
-  const { data, error } = await supabase
-    .from('payments')
-    .insert([{ user_id, amount, status }]);
+  try {
+    const { data, error } = await supabase
+      .from('payments')
+      .insert([{ user_id, amount, status }]);
 
-  if (error) {
-    console.error(error);
-    return res.status(400).json({ error: error.message });
+    if (error) throw error;
+
+    res.json({ message: 'Pago guardado en Supabase', data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
-
-  res.json({ message: 'Pago guardado en Supabase', data });
 });
 
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
 });
