@@ -1,0 +1,16 @@
+
+{
+  "name": "weweb-dlocal-backend",
+  "version": "1.0.0",
+  "description": "Backend base para pagos con dLocal y conexión a Supabase",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.3.1"
+  }
+}
