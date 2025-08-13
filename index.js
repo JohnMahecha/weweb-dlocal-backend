@@ -1,39 +1,45 @@
-import express from 'express';
-import { createClient } from '@supabase/supabase-js';
+import express from "express";
+import cors from "cors";
+import bodyParser from "body-parser";
+import { createClient } from "@supabase/supabase-js";
 
 const app = express();
-app.use(express.json());
+app.use(cors());
+app.use(bodyParser.json());
 
-// Conexión a Supabase con variables de entorno de Render
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+// Variables de entorno
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY; // aquí tienes la service_role key en Render
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Ruta de prueba para confirmar que el backend funciona
-app.get('/', (req, res) => {
-  res.send('Backend funcionando correctamente 🚀');
+// Ruta para probar que el backend responde
+app.get("/", (req, res) => {
+  res.send("Backend de dLocal con Supabase funcionando 🚀");
 });
 
-// Ruta para insertar un nuevo pago en la base de datos
-app.post('/add-payment', async (req, res) => {
-  const { user_id, amount, status } = req.body;
-
+// Ruta para agregar pago
+app.post("/api/add-payment", async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('payments')
+    const { user_id, amount, status } = req.body;
+
+    if (!user_id || !amount || !status) {
+      return res.status(400).json({ error: "Faltan campos" });
+    }
+
+    const { error } = await supabase
+      .from("payments")
       .insert([{ user_id, amount, status }]);
 
     if (error) throw error;
 
-    res.json({ message: 'Pago guardado en Supabase', data });
+    res.json({ message: "Payment added successfully" });
   } catch (err) {
-    console.error('Error insertando pago:', err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Puerto para Render
+// Iniciar servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
