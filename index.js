@@ -36,6 +36,21 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend funcionando correctamente 🎉' });
 });
 
+app.post('/add-payment', async (req, res) => {
+  const { user_id, amount, status } = req.body;
+
+  const { data, error } = await supabase
+    .from('payments')
+    .insert([{ user_id, amount, status }]);
+
+  if (error) {
+    console.error(error);
+    return res.status(400).json({ error: error.message });
+  }
+
+  res.json({ message: 'Pago guardado en Supabase', data });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
