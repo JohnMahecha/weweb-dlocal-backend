@@ -3,6 +3,12 @@ import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
+
 dotenv.config();
 
 const app = express();
