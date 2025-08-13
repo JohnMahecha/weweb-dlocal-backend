@@ -2,12 +2,15 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import express from 'express';
+
+const app = express();
+app.use(express.json());
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  process.env.SUPABASE_ANON_KEY
 );
-
 
 dotenv.config();
 
