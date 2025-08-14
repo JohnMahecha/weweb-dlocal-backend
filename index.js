@@ -1,74 +1,81 @@
-// index.js
 import express from "express";
+import bodyParser from "body-parser";
+import cors from "cors";
 import axios from "axios";
+import crypto from "crypto";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
-app.use(express.json());
+app.use(cors());
+app.use(bodyParser.json());
 
-// Variables de entorno (las configuras en Render)
-const DLOCAL_API_KEY = process.env.DLOCAL_API_KEY;
-const DLOCAL_API_SECRET = process.env.DLOCAL_API_SECRET;
-const DLOCAL_URL = "https://sandbox.dlocal.com"; // Cambia a producción cuando toque
+// Ruta de prueba para saber si el backend está vivo
+app.get("/", (req, res) => {
+  res.json({ status: "Backend funcionando" });
+});
 
-// Ruta para generar link de pago
-app.post("/crear-pago", async (req, res) => {
+// Ruta para crear el link de pago
+app.post("/api/add-payment", async (req, res) => {
   try {
-    const { amount, currency, orderId, description } = req.body;
+    const { amount, currency, description } = req.body;
 
-    // Fecha en formato UTC RFC 7231
-    const xDate = new Date().toUTCString();
+    // Fecha en UTC para X-Date
+    const date = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 
-    // Parámetros del pago
-    const body = {
-      amount,
-      currency,
-      country: "CO",
+    // Datos para DLocal
+    const payload = {
+      amount: amount || "10.00",
+      currency: currency || "USD",
+      country: "BR",
       payment_method_id: "CARD",
-      order_id: orderId,
-      description,
-      callback_url: "https://tuweb.com/callback", // Cambia por tu callback real
-      success_url: "https://tuweb.com/success",   // Cambia por tu página de éxito
-      failure_url: "https://tuweb.com/failure"    // Cambia por tu página de fallo
+      description: description || "Test Payment",
+      callback_url: "https://tusitio.com/callback",
+      success_url: "https://tusitio.com/success",
+      failure_url: "https://tusitio.com/failure",
     };
 
-    // Generar firma (según docs de DLocal)
-    const crypto = await import("crypto");
-    const rawSignature = `${DLOCAL_API_KEY}${xDate}${JSON.stringify(body)}`;
+    // Generar firma
+    const secret = process.env.DLOCAL_SECRET_KEY;
+    const requestBody = JSON.stringify(payload);
+    const signatureRaw = `${date}${requestBody}`;
     const signature = crypto
-      .createHmac("sha256", DLOCAL_API_SECRET)
-      .update(rawSignature)
+      .createHmac("sha256", secret)
+      .update(signatureRaw)
       .digest("hex");
 
-    // Llamada a DLocal
+    // Petición a DLocal
     const response = await axios.post(
-      `${DLOCAL_URL}/payments`,
-      body,
+      "https://api.dlocal.com/payments",
+      payload,
       {
         headers: {
           "Content-Type": "application/json",
-          "X-Date": xDate,
-          "X-Login": DLOCAL_API_KEY,
-          "X-Trans-Key": signature
-        }
+          "X-Date": date,
+          "X-Login": process.env.DLOCAL_API_KEY,
+          "X-Trans-Key": process.env.DLOCAL_TRAN_KEY,
+          "X-Version": "1.2",
+          "X-Signature": signature,
+        },
       }
     );
 
-    res.status(200).json({
-      message: "Pago creado correctamente",
-      dlocalResponse: response.data
+    res.json({
+      message: "Link de pago generado correctamente",
+      data: response.data,
     });
-
   } catch (error) {
-    console.error(error.response?.data || error.message);
+    console.error(error?.response?.data || error.message);
     res.status(500).json({
       message: "Error al generar el link de pago en DLocal",
-      dlocalData: error.response?.data || error.message
+      dlocalData: error?.response?.data || error.message,
     });
   }
 });
 
-// Puerto para Render
+// Iniciar servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
+  console.log(`Servidor escuchando en puerto ${PORT}`);
 });
