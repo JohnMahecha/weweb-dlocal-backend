@@ -1,77 +1,78 @@
 import express from "express";
-import bodyParser from "body-parser";
-import cors from "cors";
-import dotenv from "dotenv";
-import fetch from "node-fetch";
+import axios from "axios";
 import crypto from "crypto";
-import { createClient } from "@supabase/supabase-js";
-
-dotenv.config();
 
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+// Variables de entorno
+const DLOCAL_LOGIN = process.env.DLOCAL_LOGIN;
+const DLOCAL_TRANS_KEY = process.env.DLOCAL_TRANS_KEY;
+const DLOCAL_SECRET_KEY = process.env.DLOCAL_SECRET_KEY;
 
-app.post("/api/add-payment", async (req, res) => {
+// Endpoint para crear pago
+app.post("/create-payment", async (req, res) => {
   try {
-    const { order_id, amount, currency, country, user_id, payer } = req.body;
+    const { amount, currency, country, external_id } = req.body;
 
-    // 1️⃣ Insertar en Supabase
-    const { data: payment, error } = await supabase
-      .from("payments")
-      .insert([{ user_id, amount, status: "pending" }])
-      .select()
-      .single();
+    // Fecha en formato RFC 1123 (GMT)
+    const date = new Date().toUTCString();
 
-    if (error) throw error;
-
-    // 2️⃣ Crear pago en Dlocal
-    const dlocalPayload = {
-      order_id,
+    // Cuerpo del request
+    const body = {
       amount,
       currency,
       country,
       payment_method_id: "CARD",
-      payer,
-      redirect_url: process.env.SUCCESS_REDIRECT
+      payment_method_flow: "DIRECT",
+      order_id: external_id,
+      success_url: "https://tuweb.com/success",
+      failure_url: "https://tuweb.com/failure",
     };
 
-    const signaturePayload = `${process.env.DLOCAL_X_TRANS_KEY}${order_id}${amount}${currency}${process.env.DLOCAL_SECRET_KEY}`;
-    const signature = crypto.createHash("sha256").update(signaturePayload).digest("hex");
+    // String para firmar: metodo + path + fecha + cuerpo
+    const path = "/v1/payments";
+    const stringToSign = `POST\n${path}\n${date}\n${JSON.stringify(body)}`;
 
-    const dlocalResponse = await fetch(`${process.env.DLOCAL_HOST}/payments`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Trans-Key": process.env.DLOCAL_X_TRANS_KEY,
-        "X-Signature": signature
-      },
-      body: JSON.stringify(dlocalPayload)
-    });
+    // Firma en base64
+    const signature = crypto
+      .createHmac("sha256", DLOCAL_SECRET_KEY)
+      .update(stringToSign)
+      .digest("base64");
 
-    const dlocalData = await dlocalResponse.json();
+    // Headers requeridos
+    const headers = {
+      "Content-Type": "application/json",
+      "X-Date": date,
+      "X-Login": DLOCAL_LOGIN,
+      "X-Trans-Key": DLOCAL_TRANS_KEY,
+      Authorization: `V2-HMAC-SHA256, Signature=${signature}`,
+    };
 
-    if (!dlocalData.redirect_url) {
-      return res.status(500).json({
-        message: "Error al generar el link de pago en Dlocal",
-        dlocalData
-      });
-    }
+    // Request a DLocal
+    const response = await axios.post(
+      `https://sandbox.dlocal.com${path}`,
+      body,
+      { headers }
+    );
 
-    // 3️⃣ Devolver el link
+    // Enviar solo el link de pago
     res.json({
-      message: "Payment added successfully",
-      payment_url: dlocalData.redirect_url
+      message: "Payment created successfully",
+      payment_url: response.data.payment.payment_url,
+      dlocal_response: response.data,
     });
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error(error.response?.data || error.message);
+    res.status(500).json({
+      message: "Error al generar el link de pago en Dlocal",
+      details: error.response?.data || error.message,
+    });
   }
 });
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log(`Server running on port ${process.env.PORT || 3000}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
