@@ -11,24 +11,24 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Ruta de prueba para saber si el backend está vivo
+// Ruta de prueba
 app.get("/", (req, res) => {
   res.json({ status: "Backend funcionando" });
 });
 
-// Ruta para crear el link de pago en DLocal
+// Ruta para crear el link de pago
 app.post("/api/add-payment", async (req, res) => {
   try {
-    const { user_id, amount, currency, description } = req.body;
+    const { amount, currency, description } = req.body;
 
-    // X-Date en formato RFC 1123
-    const xDate = new Date().toUTCString();
+    // Fecha en formato ISO 8601 UTC sin milisegundos para X-Date
+    const xDate = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 
     // Datos para DLocal
     const payload = {
       amount: amount || "10.00",
       currency: currency || "USD",
-      country: "BR", // País de prueba
+      country: "BR",
       payment_method_id: "CARD",
       description: description || "Test Payment",
       callback_url: "https://tusitio.com/callback",
@@ -36,7 +36,7 @@ app.post("/api/add-payment", async (req, res) => {
       failure_url: "https://tusitio.com/failure",
     };
 
-    // Generar firma
+    // Firmar request
     const requestBody = JSON.stringify(payload);
     const signatureRaw = `${xDate}${requestBody}`;
     const signature = crypto
@@ -44,7 +44,7 @@ app.post("/api/add-payment", async (req, res) => {
       .update(signatureRaw)
       .digest("hex");
 
-    // Petición a DLocal
+    // Llamada a DLocal
     const response = await axios.post(
       "https://sandbox.dlocal.com/payments",
       payload,
