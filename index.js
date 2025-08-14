@@ -28,12 +28,12 @@ app.post("/api/add-payment", async (req, res) => {
     const payload = {
       amount: amount || "10.00",
       currency: currency || "USD",
-      country: "BR",
+      country: "BR", // Cambia según el país de prueba
       payment_method_id: "CARD",
       description: description || "Test Payment",
-      callback_url: "https://tusitio.com/callback",
-      success_url: "https://tusitio.com/success",
-      failure_url: "https://tusitio.com/failure",
+      callback_url: process.env.BASE_URL + "/callback",
+      success_url: process.env.SUCCESS_REDIRECT,
+      failure_url: process.env.SUCCESS_REDIRECT, // puedes cambiar si quieres un failure aparte
     };
 
     // Generar firma
@@ -47,14 +47,14 @@ app.post("/api/add-payment", async (req, res) => {
 
     // Petición a DLocal
     const response = await axios.post(
-      "https://api.dlocal.com/payments",
+      `${process.env.DLOCAL_HOST}/payments`,
       payload,
       {
         headers: {
           "Content-Type": "application/json",
           "X-Date": date,
           "X-Login": process.env.DLOCAL_API_KEY,
-          "X-Trans-Key": process.env.DLOCAL_TRAN_KEY,
+          "X-Trans-Key": process.env.DLOCAL_X_TRANS_KEY, // corregido aquí
           "X-Version": "1.2",
           "X-Signature": signature,
         },
