@@ -1,9 +1,9 @@
-// index.js
 import express from "express";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
 import cors from "cors";
 import fetch from "node-fetch";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -11,40 +11,70 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-const PORT = process.env.PORT || 3000;
-const DLOCAL_API_KEY = process.env.DLOCAL_API_KEY;
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+// Configuración Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
 
-if (!DLOCAL_API_KEY || !SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("❌ Variables de entorno faltantes. Revisa tu archivo .env o Render.");
-  process.exit(1);
-}
-
-app.get("/", (req, res) => {
-  res.send("✅ Backend de DLocal funcionando");
-});
-
-// Ejemplo de endpoint para iniciar pago con DLocal
-app.post("/pago", async (req, res) => {
+// Endpoint para crear pago
+app.post("/api/add-payment", async (req, res) => {
   try {
-    const response = await fetch("https://api.dlocal.com/payments", {
+    const { amount, currency, description, payer } = req.body;
+
+    if (!amount || !currency || !description || !payer) {
+      return res.status(400).json({ error: "Faltan campos requeridos" });
+    }
+
+    // Petición a DLocal
+    const dlocalResponse = await fetch("https://api.dlocal.com/v1/payments", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${DLOCAL_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.DLOCAL_API_KEY}`,
       },
-      body: JSON.stringify(req.body)
+      body: JSON.stringify({
+        amount,
+        currency,
+        description,
+        payer
+      }),
     });
 
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error("❌ Error al procesar el pago:", error);
-    res.status(500).json({ error: "Error en el pago" });
+    const dlocalData = await dlocalResponse.json();
+
+    // Guardar en Supabase
+    const { data, error } = await supabase
+      .from("payments")
+      .insert([
+        {
+          amount,
+          currency,
+          description,
+          payer_name: payer.name,
+          payer_email: payer.email,
+          payment_id: dlocalData.id || null,
+          status: dlocalData.status || "pending"
+        }
+      ]);
+
+    if (error) {
+      console.error("Error guardando en Supabase:", error);
+    }
+
+    res.json({
+      message: "Pago creado correctamente",
+      dlocal: dlocalData,
+      supabase: data
+    });
+
+  } catch (err) {
+    console.error("Error en /api/add-payment:", err);
+    res.status(500).json({ error: "Error interno en el servidor" });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+// Iniciar servidor
+app.listen(process.env.PORT || 3000, () => {
+  console.log(`Servidor corriendo en puerto ${process.env.PORT || 3000}`);
 });
