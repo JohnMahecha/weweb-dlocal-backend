@@ -11,20 +11,22 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Ruta de prueba
 app.get("/", (req, res) => {
   res.json({ status: "Backend funcionando" });
 });
 
-// Ruta para crear el link de pago
 app.post("/api/add-payment", async (req, res) => {
   try {
     const { amount, currency, description } = req.body;
 
-    // Fecha en formato ISO 8601 UTC sin milisegundos para X-Date
-    const xDate = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+    // Formato UTC sin milisegundos
+    const date = new Date().toISOString().split(".")[0] + "Z";
 
-    // Datos para DLocal
+    // DEBUG: imprimir llaves para confirmar que no están undefined
+    console.log("DLOCAL_API_KEY:", process.env.DLOCAL_API_KEY);
+    console.log("DLOCAL_TRAN_KEY:", process.env.DLOCAL_TRAN_KEY);
+    console.log("DLOCAL_SECRET_KEY:", process.env.DLOCAL_SECRET_KEY);
+
     const payload = {
       amount: amount || "10.00",
       currency: currency || "USD",
@@ -36,22 +38,21 @@ app.post("/api/add-payment", async (req, res) => {
       failure_url: "https://tusitio.com/failure",
     };
 
-    // Firmar request
+    const secret = process.env.DLOCAL_SECRET_KEY;
     const requestBody = JSON.stringify(payload);
-    const signatureRaw = `${xDate}${requestBody}`;
+    const signatureRaw = `${date}${requestBody}`;
     const signature = crypto
-      .createHmac("sha256", process.env.DLOCAL_SECRET_KEY)
+      .createHmac("sha256", secret)
       .update(signatureRaw)
       .digest("hex");
 
-    // Llamada a DLocal
     const response = await axios.post(
       "https://sandbox.dlocal.com/payments",
       payload,
       {
         headers: {
           "Content-Type": "application/json",
-          "X-Date": xDate,
+          "X-Date": date,
           "X-Login": process.env.DLOCAL_API_KEY,
           "X-Trans-Key": process.env.DLOCAL_TRAN_KEY,
           "X-Version": "1.2",
@@ -73,7 +74,6 @@ app.post("/api/add-payment", async (req, res) => {
   }
 });
 
-// Iniciar servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
