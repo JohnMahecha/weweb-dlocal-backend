@@ -1,99 +1,94 @@
 import express from "express";
-import axios from "axios";
-import cors from "cors";
-import bodyParser from "body-parser";
+import fetch from "node-fetch";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
-// Variables de entorno (puedes usar dotenv si quieres)
-const BASE_URL = "https://weweb-dlocal-backend.onrender.com";
+// Env variables
+const SUPABASE_URL = "https://dbtxxvgacdolswvvancu.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRidHh4dmdhY2RvbHN3dnZhbmN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwOTk0MjUsImV4cCI6MjA3MDY3NTQyNX0.4_KQNNVDTV6ecXLoP67X3k0Ed5ZuH878Y-zvi2cntkM";
 const DLOCAL_HOST = "https://sandbox.dlocal.com";
 const DLOCAL_SECRET_KEY = "KQgIQ2OWOwfusCoe5Vd3lSVorZE1l3YxsqLYMJhD";
 const DLOCAL_X_TRANS_KEY = "hoWSfdKWUujGYaGZXMksHTlyMEwFTtYI";
 const SUCCESS_REDIRECT = "https://a669447f-3cb2-4c91-89e2-e0a8c395b8ed.weweb-preview.io/checkout-pay-succefull/";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRidHh4dmdhY2RvbHN3dnZhbmN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwOTk0MjUsImV4cCI6MjA3MDY3NTQyNX0.4_KQNNVDTV6ecXLoP67X3k0Ed5ZuH878Y-zvi2cntkM";
-const SUPABASE_URL = "https://dbtxxvgacdolswvvancu.supabase.co";
 
-// Cliente Supabase
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Ruta para crear el pago y generar link de DLocal
+// Función para generar la firma de Dlocal
+function generateSignature(body, secret) {
+  return crypto.createHmac("sha256", secret).update(body).digest("hex");
+}
+
 app.post("/api/add-payment", async (req, res) => {
   try {
     const { user_id, amount } = req.body;
 
-    // 1. Guardar en Supabase
-    const { data: insertedData, error } = await supabase
+    // 1️⃣ Guardar en Supabase
+    const { data, error } = await supabase
       .from("payments")
       .insert([{ user_id, amount, status: "pending" }])
       .select()
       .single();
 
     if (error) {
-      console.error("Error insertando en Supabase:", error);
-      return res.status(500).json({ error: "Error al guardar el pago" });
+      return res.status(500).json({ message: "Error saving payment", error });
     }
 
-    // 2. Preparar datos para DLocal
-    const paymentId = insertedData.id.toString();
-    const currency = "USD";
-    const country = "CO"; // Cambia si es otro país
-    const paymentMethodId = "CARD"; // Ajusta según tu integración
-
+    // 2️⃣ Crear pago en Dlocal
+    const orderId = `order_${Date.now()}`;
     const paymentPayload = {
-      amount,
-      currency,
-      country,
-      payment_method_id: paymentMethodId,
-      order_id: paymentId,
+      amount: amount,
+      currency: "USD",
+      country: "CO",
+      payment_method_id: "CARD",
+      payment_method_flow: "REDIRECT",
       payer: {
-        name: "Cliente Prueba",
-        email: "cliente@example.com"
+        name: "John Mahecha",
+        email: "test@example.com"
       },
-      redirect_url: SUCCESS_REDIRECT
+      order_id: orderId,
+      callback_url: `${process.env.BASE_URL || "https://weweb-dlocal-backend.onrender.com"}/api/dlocal-callback`,
+      success_url: SUCCESS_REDIRECT
     };
 
-    // 3. Firmar petición para DLocal
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signatureString = `${timestamp}${DLOCAL_X_TRANS_KEY}${JSON.stringify(paymentPayload)}${DLOCAL_SECRET_KEY}`;
-    const signature = crypto.createHash("sha256").update(signatureString).digest("hex");
+    const bodyString = JSON.stringify(paymentPayload);
+    const signature = generateSignature(bodyString, DLOCAL_SECRET_KEY);
 
-    // 4. Llamar a DLocal
-    const dlocalResponse = await axios.post(
-      `${DLOCAL_HOST}/v1/payments`,
-      paymentPayload,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "X-Date": timestamp,
-          "X-Login": DLOCAL_X_TRANS_KEY,
-          "X-Trans-Key": DLOCAL_X_TRANS_KEY,
-          "X-Version": "1.2",
-          "X-Signature": signature
-        }
-      }
-    );
+    const dlocalRes = await fetch(`${DLOCAL_HOST}/payments`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Trans-Key": DLOCAL_X_TRANS_KEY,
+        "X-Signature": signature
+      },
+      body: bodyString
+    });
 
-    // 5. Retornar el link de pago
-    if (dlocalResponse.data && dlocalResponse.data.redirect_url) {
-      return res.json({
-        message: "Payment created successfully",
-        redirect_url: dlocalResponse.data.redirect_url
+    const dlocalData = await dlocalRes.json();
+
+    if (!dlocalRes.ok) {
+      return res.status(500).json({
+        message: "Error creating Dlocal payment",
+        error: dlocalData
       });
-    } else {
-      return res.status(500).json({ error: "No se recibió URL de pago de DLocal" });
     }
+
+    // 3️⃣ Devolver el link de pago
+    return res.status(200).json({
+      message: "Payment created successfully",
+      supabaseRow: data,
+      dlocal: dlocalData,
+      redirect_url: dlocalData.redirect_url
+    });
+
   } catch (err) {
-    console.error("Error creando pago:", err.response?.data || err.message);
-    res.status(500).json({ error: "Error interno creando pago" });
+    return res.status(500).json({
+      message: "Internal server error",
+      error: err.message
+    });
   }
 });
 
-// Iniciar servidor
-app.listen(3000, () => {
-  console.log("Servidor escuchando en puerto 3000");
-});
+app.listen(3000, () => console.log("Server running on port 3000"));
