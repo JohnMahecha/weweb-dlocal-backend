@@ -1,87 +1,79 @@
-// index.js
 import express from "express";
-import fetch from "node-fetch";
+import bodyParser from "body-parser";
+import cors from "cors";
+import axios from "axios";
 import crypto from "crypto";
 import dotenv from "dotenv";
 
 dotenv.config();
-const app = express();
-app.use(express.json());
 
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+
+// Ruta de prueba para saber si el backend está vivo
+app.get("/", (req, res) => {
+  res.json({ status: "Backend funcionando" });
+});
+
+// Ruta para crear el link de pago en DLocal
 app.post("/api/add-payment", async (req, res) => {
   try {
-    const {
-      amount,
-      currency,
-      country,
-      payment_method_id,
-      payer,
-      order_id
-    } = req.body;
+    const { user_id, amount, currency, description } = req.body;
 
-    if (!amount || !currency || !country || !payment_method_id || !payer || !order_id) {
-      return res.status(400).json({ message: "Faltan parámetros obligatorios" });
-    }
+    // X-Date en formato RFC 1123
+    const xDate = new Date().toUTCString();
 
-    const apiKey = process.env.DLOCAL_API_KEY;
-    const secretKey = process.env.DLOCAL_SECRET_KEY;
-    const host = process.env.DLOCAL_HOST || "https://sandbox.dlocal.com";
-    const successRedirect = process.env.SUCCESS_REDIRECT;
-
-    // Formato correcto para X-Date
-    const timestamp = new Date().toISOString(); // Ej: 2025-08-14T20:55:34Z
-
-    const paymentData = {
-      amount,
-      currency,
-      country,
-      payment_method_id,
-      payment_method_flow: "REDIRECT",
-      payer,
-      order_id,
-      callback_url: `${process.env.BASE_URL}/api/payment-callback`,
-      success_url: successRedirect
+    // Datos para DLocal
+    const payload = {
+      amount: amount || "10.00",
+      currency: currency || "USD",
+      country: "BR", // País de prueba
+      payment_method_id: "CARD",
+      description: description || "Test Payment",
+      callback_url: "https://tusitio.com/callback",
+      success_url: "https://tusitio.com/success",
+      failure_url: "https://tusitio.com/failure",
     };
 
-    const requestBodyString = JSON.stringify(paymentData);
-
-    // Firma HMAC
+    // Generar firma
+    const requestBody = JSON.stringify(payload);
+    const signatureRaw = `${xDate}${requestBody}`;
     const signature = crypto
-      .createHmac("sha256", secretKey)
-      .update(`${timestamp}${requestBodyString}`)
+      .createHmac("sha256", process.env.DLOCAL_SECRET_KEY)
+      .update(signatureRaw)
       .digest("hex");
 
-    const response = await fetch(`${host}/payments`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `${apiKey}:${signature}`,
-        "X-Date": timestamp
-      },
-      body: requestBodyString
-    });
+    // Petición a DLocal
+    const response = await axios.post(
+      "https://sandbox.dlocal.com/payments",
+      payload,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-Date": xDate,
+          "X-Login": process.env.DLOCAL_API_KEY,
+          "X-Trans-Key": process.env.DLOCAL_TRAN_KEY,
+          "X-Version": "1.2",
+          "X-Signature": signature,
+        },
+      }
+    );
 
-    const dlocalData = await response.json();
-
-    if (!response.ok) {
-      return res.status(400).json({
-        message: "Error al generar el link de pago en DLocal",
-        dlocalData
-      });
-    }
-
-    return res.json({
+    res.json({
       message: "Link de pago generado correctamente",
-      link: dlocalData.redirect_url,
-      dlocalResponse: dlocalData
+      data: response.data,
     });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Error interno del servidor" });
+    console.error(error?.response?.data || error.message);
+    res.status(500).json({
+      message: "Error al generar el link de pago en DLocal",
+      dlocalData: error?.response?.data || error.message,
+    });
   }
 });
 
+// Iniciar servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
