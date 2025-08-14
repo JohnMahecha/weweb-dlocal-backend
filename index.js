@@ -15,7 +15,6 @@ app.use(express.urlencoded({ extended: true })); // para callback x-www-form-url
 const {
   SUPABASE_URL,
   SUPABASE_KEY, // usa service_role en server si puedes
-  DLOCAL_X_LOGIN,
   DLOCAL_X_TRANS_KEY,
   DLOCAL_SECRET_KEY,
   DLOCAL_HOST = 'https://sandbox.dlocal.com',
