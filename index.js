@@ -8,7 +8,6 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-// Crear un pago en DLocal
 app.post("/api/add-payment", async (req, res) => {
   try {
     const {
@@ -20,7 +19,6 @@ app.post("/api/add-payment", async (req, res) => {
       order_id
     } = req.body;
 
-    // Validar datos
     if (!amount || !currency || !country || !payment_method_id || !payer || !order_id) {
       return res.status(400).json({ message: "Faltan parámetros obligatorios" });
     }
@@ -30,10 +28,9 @@ app.post("/api/add-payment", async (req, res) => {
     const host = process.env.DLOCAL_HOST || "https://sandbox.dlocal.com";
     const successRedirect = process.env.SUCCESS_REDIRECT;
 
-    // Timestamp para la firma
-    const timestamp = Math.floor(Date.now() / 1000);
+    // Formato correcto para X-Date
+    const timestamp = new Date().toISOString(); // Ej: 2025-08-14T20:55:34Z
 
-    // Cuerpo para DLocal
     const paymentData = {
       amount,
       currency,
@@ -46,14 +43,14 @@ app.post("/api/add-payment", async (req, res) => {
       success_url: successRedirect
     };
 
-    // Generar firma HMAC SHA256
     const requestBodyString = JSON.stringify(paymentData);
+
+    // Firma HMAC
     const signature = crypto
       .createHmac("sha256", secretKey)
       .update(`${timestamp}${requestBodyString}`)
       .digest("hex");
 
-    // Hacer request a DLocal
     const response = await fetch(`${host}/payments`, {
       method: "POST",
       headers: {
@@ -85,7 +82,6 @@ app.post("/api/add-payment", async (req, res) => {
   }
 });
 
-// Puerto
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
