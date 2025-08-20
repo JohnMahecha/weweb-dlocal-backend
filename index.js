@@ -30,19 +30,22 @@ app.post("/api/add-payment", async (req, res) => {
     // Payload requerido por dLocal Go
     // ===========================
     const payload = {
-      amount: amount || "10.00",
-      currency: currency || "USD",
-      country: "BR", // ⚠️ cambia a "CO" si pruebas en Colombia
-      payment_method_id: "CARD",
-      description: description || "Test Payment",
-      payer: {
-        name: "John Test",
-        email: "john@test.com"
-      },
-      callback_url: "https://tusitio.com/callback",
-      success_url: "https://tusitio.com/success",
-      failure_url: "https://tusitio.com/failure"
-    };
+  amount: amount || "10.00",
+  currency: currency || "USD",
+  country: "BR", // ⚠️ cambia a "CO" si pruebas en Colombia
+  payment_method_id: "CARD",
+  description: description || "Test Payment",
+  payer: {
+    name: "John Test",
+    email: "john@test.com",
+    document: "1234567890",   // 🔑 documento requerido en muchos países
+    document_type: "ID"       // puedes probar con "ID" o "CC" en Colombia
+  },
+  callback_url: "https://tusitio.com/callback",
+  success_url: "https://tusitio.com/success",
+  failure_url: "https://tusitio.com/failure"
+};
+
 
     console.log("Payload enviado a dLocal:", payload);
 
