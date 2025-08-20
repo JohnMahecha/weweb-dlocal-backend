@@ -26,21 +26,25 @@ app.post("/api/add-payment", async (req, res) => {
     console.log("DLOCAL_API_KEY:", process.env.DLOCAL_API_KEY);
     console.log("DLOCAL_SECRET_KEY:", process.env.DLOCAL_SECRET_KEY);
 
+    // ===========================
+    // Payload requerido por dLocal Go
+    // ===========================
     const payload = {
-  amount: amount || "10.00",
-  currency: currency || "USD",
-  country: "BR", // ⚠️ cámbialo a "CO" si estás probando Colombia
-  payment_method_id: "CARD",
-  description: description || "Test Payment",
-  payer: {
-    name: "John Test",
-    email: "john@test.com"
-  },
-  callback_url: "https://tusitio.com/callback",
-  success_url: "https://tusitio.com/success",
-  failure_url: "https://tusitio.com/failure",
-};
+      amount: amount || "10.00",
+      currency: currency || "USD",
+      country: "BR", // ⚠️ cambia a "CO" si pruebas en Colombia
+      payment_method_id: "CARD",
+      description: description || "Test Payment",
+      payer: {
+        name: "John Test",
+        email: "john@test.com"
+      },
+      callback_url: "https://tusitio.com/callback",
+      success_url: "https://tusitio.com/success",
+      failure_url: "https://tusitio.com/failure"
+    };
 
+    console.log("Payload enviado a dLocal:", payload);
 
     // ===========================
     // Firma (X-Date + X-Login + Body)
@@ -69,20 +73,20 @@ app.post("/api/add-payment", async (req, res) => {
           "X-Date": date,
           "X-Login": login,
           "X-Version": "1.2",
-          "X-Signature": signature,
-        },
+          "X-Signature": signature
+        }
       }
     );
 
     res.json({
       message: "Link de pago generado correctamente",
-      data: response.data,
+      data: response.data
     });
   } catch (error) {
     console.error("Error DLocal:", error?.response?.data || error.message);
     res.status(500).json({
       message: "Error al generar el link de pago en DLocal Go",
-      dlocalData: error?.response?.data || error.message,
+      dlocalData: error?.response?.data || error.message
     });
   }
 });
