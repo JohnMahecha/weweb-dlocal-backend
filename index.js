@@ -27,15 +27,20 @@ app.post("/api/add-payment", async (req, res) => {
     console.log("DLOCAL_SECRET_KEY:", process.env.DLOCAL_SECRET_KEY);
 
     const payload = {
-      amount: amount || "10.00",
-      currency: currency || "USD",
-      country: "BR", // ⚠️ cambia a "CO" si vas a probar en Colombia
-      payment_method_id: "CARD",
-      description: description || "Test Payment",
-      callback_url: "https://tusitio.com/callback",
-      success_url: "https://tusitio.com/success",
-      failure_url: "https://tusitio.com/failure",
-    };
+  amount: amount || "10.00",
+  currency: currency || "USD",
+  country: "BR", // ⚠️ cámbialo a "CO" si estás probando Colombia
+  payment_method_id: "CARD",
+  description: description || "Test Payment",
+  payer: {
+    name: "John Test",
+    email: "john@test.com"
+  },
+  callback_url: "https://tusitio.com/callback",
+  success_url: "https://tusitio.com/success",
+  failure_url: "https://tusitio.com/failure",
+};
+
 
     // ===========================
     // Firma (X-Date + X-Login + Body)
