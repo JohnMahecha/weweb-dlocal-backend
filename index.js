@@ -12,7 +12,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 app.get("/", (req, res) => {
-  res.json({ status: "Backend funcionando con dLocal Go" });
+  res.json({ status: "Backend funcionando con dLocal Go - CO" });
 });
 
 app.post("/api/add-payment", async (req, res) => {
@@ -27,19 +27,19 @@ app.post("/api/add-payment", async (req, res) => {
     console.log("DLOCAL_SECRET_KEY:", process.env.DLOCAL_SECRET_KEY);
 
     // ===========================
-    // Payload requerido por dLocal Go
+    // Payload para Colombia
     // ===========================
     const payload = {
       amount: amount || "10.00",
       currency: currency || "USD",
-      country: "BR", // ⚠️ cámbialo a "CO" si pruebas en Colombia
+      country: "CO",
       payment_method_id: "CARD",
       description: description || "Test Payment",
       payer: {
         name: "John Test",
         email: "john@test.com",
-        document: "1234567890",   // ⚠️ obligatorio en muchos países
-        document_type: "ID"       // ⚠️ en Colombia prueba con "CC"
+        document: "1234567890",   // Número de cédula ficticio para sandbox
+        document_type: "CC"       // Cédula de ciudadanía (Colombia)
       },
       callback_url: "https://tusitio.com/callback",
       success_url: "https://tusitio.com/success",
