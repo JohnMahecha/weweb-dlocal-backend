@@ -11,36 +11,43 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+// Ruta de prueba
 app.get("/", (req, res) => {
   res.json({ status: "Backend funcionando con dLocal Go - CO" });
 });
 
+// Crear un pago
 app.post("/api/add-payment", async (req, res) => {
   try {
     const { amount, currency, description } = req.body;
 
-    // Fecha UTC en formato ISO sin ms
+    // Fecha en UTC sin milisegundos
     const date = new Date().toISOString().split(".")[0] + "Z";
 
-    // Payload Colombia ejemplo
+    console.log("DLOCAL_API_KEY:", process.env.DLOCAL_API_KEY);
+    console.log("DLOCAL_SECRET_KEY:", process.env.DLOCAL_SECRET_KEY);
+
+    // Payload de prueba para Colombia
     const payload = {
-      amount: amount || "10000",
+      amount: amount || "15000",
       currency: currency || "COP",
       country: "CO",
       payment_method_id: "CARD",
-      description: description || "Compra prueba",
+      description: description || "Test Payment",
       payer: {
         name: "John Test",
         email: "john@test.com",
-        document: "1234567890",
-        document_type: "CC",
+        document: "1234567890", // Documento ficticio sandbox
+        document_type: "CC", // Cédula de ciudadanía
       },
       callback_url: "https://tusitio.com/callback",
       success_url: "https://tusitio.com/success",
       failure_url: "https://tusitio.com/failure",
     };
 
-    // Firmar solo con API_KEY + SECRET_KEY
+    // ===========================
+    // Firma con API_KEY + SECRET
+    // ===========================
     const secret = process.env.DLOCAL_SECRET_KEY;
     const requestBody = JSON.stringify(payload);
     const signatureRaw = `${date}${requestBody}`;
@@ -49,9 +56,11 @@ app.post("/api/add-payment", async (req, res) => {
       .update(signatureRaw)
       .digest("hex");
 
-    // Petición a dLocal Go (sandbox)
+    // ===========================
+    // Request hacia dLocal Go
+    // ===========================
     const response = await axios.post(
-      "https://sandbox.dlocalgo.com/payments",
+      "https://api.dlocalgo.com/payments",
       payload,
       {
         headers: {
@@ -71,7 +80,7 @@ app.post("/api/add-payment", async (req, res) => {
   } catch (error) {
     console.error(error?.response?.data || error.message);
     res.status(500).json({
-      message: "Error al generar el link de pago en DLocal Go",
+      message: "Error al generar el link de pago en dLocal Go",
       dlocalData: error?.response?.data || error.message,
     });
   }
